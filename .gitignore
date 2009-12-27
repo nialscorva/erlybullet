@@ -1,0 +1,14 @@
+.project
+.settings/
+doc/
+ebin/
+src/TRGWHandshake.asn1db
+src/TRGWHandshake.erl
+src/TRProtocol.asn1db
+src/TRProtocol.erl
+logs
+erl_crash.dump
+include/TRGWHandshake.hrl
+include/TRProtocol.hrl
+.cproject
+priv/erlybullet_drv.so
