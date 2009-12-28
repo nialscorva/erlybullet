@@ -1,29 +1,29 @@
 %% @author jason
 %% @copyright jason Dec 27, 2009  PROPRIETARY-- NOT FOR DISTRIBUTION
-%% @doc TODO: Add description to erlybullet_app_tests
+%% @doc TODO: Add description to erlybullet_tests
 %% @end
 %% --------------------------------------------------------------------
--module(erlybullet_app_tests).
+-module(erlybullet_tests).
 -include_lib("eunit/include/eunit.hrl").
 
 % External exports
 -export([]).
 % test cases for the module with setup and teardown
-erlybullet_app_tests_test_() ->
+erlybullet_tests_test_() ->
   { foreach,
      fun() -> setup() end,  % setup
      fun(SetupRetVal) -> teardown(SetupRetVal) end, % teardown
      [
-        ?_assert(lists:any(fun({erlybullet,_,_}) -> true ; (_) -> false end, application:loaded_applications()))
+        ?_test(test_create())
      ]
    }.
 
-setup() ->
-  application:start(erlybullet),
-  ok.
+setup() -> ok.
 
-teardown(_SetupRetval) ->
-  application:stop(erlybullet),
-  ok.
+teardown(_SetupRetval) -> ok.
 
+test_create() ->
+  {ok,Pid}=erlybullet:start_link(),
+  erlybullet:stop(Pid),
+  ?assertNot(is_process_alive(Pid)).
 

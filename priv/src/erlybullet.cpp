@@ -7,8 +7,6 @@
 /* Driver interface declarations */
 static ErlDrvData start(ErlDrvPort port, char *command);
 static void stop(ErlDrvData drv_data);
-static int control(ErlDrvData drv_data, unsigned int command, char *buf,
-                   int len, char **rbuf, int rlen);
 
 static ErlDrvEntry erlybullet_driver_entry = {
     NULL,                        /* init */
@@ -20,7 +18,7 @@ static ErlDrvEntry erlybullet_driver_entry = {
     "erlybullet_drv",            /* the name of the driver */
     NULL,                        /* finish */
     NULL,                        /* handle */
-    control,
+    NULL,                        /* control */
     NULL,                        /* timeout */
     NULL,                        /* output */
     NULL,                        /* ready_async */
@@ -56,12 +54,5 @@ ErlDrvData start(ErlDrvPort port, char *command)
 void stop(ErlDrvData drv_data)
 {
 	driver_data *data = reinterpret_cast<driver_data*>(drv_data);
-
-}
-
-//--------------------------------------------------------------------------------
-// Accepts data from the VM
-int control(ErlDrvData drv_data, unsigned int command, char *buf, int len, char **rbuf, int rlen)
-{
 
 }

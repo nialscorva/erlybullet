@@ -8,17 +8,28 @@
 -behaviour(gen_server).
 
 % External exports
--export([start_link/0]).
+-export([start_link/0,stop/1]).
 
 % gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {}).
+-record(state, {port}).
 
-
-
+% --------------------------------------------------------------------
+%% @spec start_link() -> {ok, Pid}
+%% @doc Starts the bullet node.
+%% @end
+% --------------------------------------------------------------------
 start_link() ->
-  ok.
+  gen_server:start_link(?MODULE,[],[]).
+
+% --------------------------------------------------------------------
+%% @spec stop(Pid) -> {ok, Pid}
+%% @doc Stops the bullet engine and frees the resources.
+%% @end
+% --------------------------------------------------------------------
+stop(Pid) when is_pid(Pid) ->
+  gen_server:call(Pid,{stop}).
 
 % --------------------------------------------------------------------
 %% @spec init([]) ->
@@ -31,7 +42,13 @@ start_link() ->
 %% @end 
 % --------------------------------------------------------------------
 init([]) ->
-    {ok, #state{}}.
+  case erl_ddll:load_driver(code:lib_dir(erlybullet,priv), "erlybullet_drv") of
+        ok -> ok;
+        {error, already_loaded} -> ok;
+        E -> exit({stop, E})
+  end,
+  Port=open_port({spawn, "erlybullet_drv"}, [binary]),
+  {ok, #state{port=Port}}.
 
 % --------------------------------------------------------------------
 %% @spec handle_call(Request::term(), From::pid(), State::state()) ->
@@ -45,6 +62,8 @@ init([]) ->
 %% @doc Handling call messages
 %% @end
 % --------------------------------------------------------------------
+handle_call({stop}, _From, State) ->
+  {stop,normal,ok,State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -79,8 +98,9 @@ handle_info(_Info, State) ->
 %% @doc Shutdown the server
 %% @end
 % --------------------------------------------------------------------
-terminate(_Reason, _State) ->
-    ok.
+terminate(_Reason, #state{port=Port}) ->
+  port_close(Port),
+  ok.
 
 % --------------------------------------------------------------------
 %% @spec code_change(OldVsn,State,Extra) -> {ok, NewState}
