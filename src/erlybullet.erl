@@ -7,16 +7,18 @@
 
 -behaviour(gen_server).
 
+-include_lib("erlybullet/include/erlybulletcommands.hrl").
+
 % External exports
--export([start_link/0,stop/1]).
+-export([start_link/0,stop/1,create_entity/3,step_simulation/1]).
 
 % gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {port}).
+-record(state, {port,next_id=1}).
 
 % --------------------------------------------------------------------
-%% @spec start_link() -> {ok, Pid}
+%% @spec start_link() -> {ok, World::pid()}
 %% @doc Starts the bullet node.
 %% @end
 % --------------------------------------------------------------------
@@ -24,12 +26,28 @@ start_link() ->
   gen_server:start_link(?MODULE,[],[]).
 
 % --------------------------------------------------------------------
-%% @spec stop(Pid) -> {ok, Pid}
+%% @spec stop(World::pid()) -> ok
 %% @doc Stops the bullet engine and frees the resources.
 %% @end
 % --------------------------------------------------------------------
-stop(Pid) when is_pid(Pid) ->
-  gen_server:call(Pid,{stop}).
+stop(World) when is_pid(World) ->
+  gen_server:call(World,{stop}).
+
+% --------------------------------------------------------------------
+%% @spec step_simulation(World::pid()) -> ok
+%% @doc Asynchronously advances the simulation by a time unit.
+%% @end
+% --------------------------------------------------------------------
+step_simulation(World) when is_pid(World) ->
+  gen_server:cast(World,{step_simulation}).
+
+% --------------------------------------------------------------------
+%% @spec create_entity(World,BoundPid::pid,Options) -> {ok, EntityId}
+%% @doc Creates a new entity in the world using Options.
+%% @end
+% --------------------------------------------------------------------
+create_entity(World,BoundPid,Options) when is_pid(World),is_pid(BoundPid),is_list(Options) ->
+  gen_server:call(World,{create_entity,BoundPid,Options}).
 
 % --------------------------------------------------------------------
 %% @spec init([]) ->
@@ -64,9 +82,14 @@ init([]) ->
 % --------------------------------------------------------------------
 handle_call({stop}, _From, State) ->
   {stop,normal,ok,State};
-handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+handle_call({create_entity,_BoundPid,Options},_From,State) ->
+  ShapeBin    = shape_to_binary(proplists:get_value(shape,Options)),
+  Id          = State#state.next_id, 
+  Mass        = proplists:get_value(mass,Options,1.0),
+  LocBin      = vector_to_binary(proplists:get_value(location,Options,{0.0,0.0,0.0})),
+  VelocityBin = vector_to_binary(proplists:get_value(velocity,Options,{0.0,0.0,0.0})),
+  call_port(State#state.port,<<ShapeBin/binary,Id:64/native-integer,Mass/float,LocBin/binary,VelocityBin/binary>>),
+  {reply,{ok,Id},State#state{next_id=Id+1}}.
 
 % --------------------------------------------------------------------
 %% @spec handle_cast(Msg::term(), State::state()) ->
@@ -77,8 +100,9 @@ handle_call(_Request, _From, State) ->
 %% @doc Handling cast messages
 %% @end
 % --------------------------------------------------------------------
-handle_cast(_Msg, State) ->
-    {noreply, State}.
+handle_cast({step_simulation}, #state{port=Port}=State) ->
+  call_port(Port,<<?EB_STEP_SIMULATION:8/integer>>),
+  {noreply, State}.
 
 % --------------------------------------------------------------------
 %% @spec handle_info(Info::term(), State::state()) ->
@@ -111,3 +135,17 @@ terminate(_Reason, #state{port=Port}) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+
+call_port(Port, Command) when is_port(Port) ->
+  port_command(Port, Command),
+  receive
+    {port,Data} -> Data
+    after 100 -> {error, timeout}
+  end.
+
+cast_port(Port, Command) when is_port(Port) ->
+  port_command(Port,Command).
+
+shape_to_binary({sphere,Radius}) -> <<?EB_ADD_SPHERE,Radius/native-float>>.
+
+vector_to_binary({X,Y,Z}) -> <<X/native-float,Y/native-float,Z/native-float>>.

@@ -16,8 +16,10 @@ includedir := include
 erl_node := -sname e1
 erl_path := 
 #-pz ${ebin}
-erl_boot := -boot ${ebin}/${appname}
-erl_config := -config conf/${appname}
+erl_boot := 
+#-boot ${ebin}/${appname}
+erl_config := 
+#-config conf/${appname}
 erlc_flags := +debug_info
 #inputs 
 sources = $(shell find ${src} -iname \*.erl)

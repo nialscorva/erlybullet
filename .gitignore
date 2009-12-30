@@ -12,3 +12,4 @@ include/TRGWHandshake.hrl
 include/TRProtocol.hrl
 .cproject
 priv/erlybullet_drv.so
+include/erlybulletcommands.hrl
