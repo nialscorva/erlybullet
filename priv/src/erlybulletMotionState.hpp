@@ -23,11 +23,6 @@ public:
   virtual void setWorldTransform(const btTransform &worldTrans) {
   	dirty=true;
   	mPos1=worldTrans;
-//      if(NULL == mVisibleobj) return; // silently return before we set a node
-//      btQuaternion rot = worldTrans.getRotation();
-//      mVisibleobj->setOrientation(rot.w(), rot.x(), rot.y(), rot.z());
-//      btVector3 pos = worldTrans.getOrigin();
-//      mVisibleobj->setPosition(pos.x(), pos.y(), pos.z());
   }
 
   virtual void setClean() { dirty=false; }

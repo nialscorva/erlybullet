@@ -16,7 +16,9 @@ erlybullet_tests_test_() ->
      fun(SetupRetVal) -> teardown(SetupRetVal) end, % teardown
      [
         ?_test(test_create()),
-        ?_test(test_entity_create())
+        ?_test(test_entity_create()),
+        ?_test(test_entity_custom_id())
+        
      ]
    }.
 
@@ -44,3 +46,23 @@ test_entity_create() ->
   end,
   ?assertMatch(ok, RetVal),
   erlybullet:stop(World).
+
+test_entity_custom_id() ->
+  EntityId=test_id,
+  {ok,World}=erlybullet:start_link(),
+  {ok,EntityId} = erlybullet:create_entity(World,
+                                           self(),
+                                           [{id,EntityId},
+                                            {shape,{sphere,50.0}},
+                                            {location,{0.0,0.0,0.0}},
+                                            {mass, 25.0},
+                                            {velocity,{100.0,0.0,100.0}}]),
+  erlybullet:step_simulation(World),
+  RetVal=receive
+    {erlybullet,EntityId,{location,{_X,_Y,_Z}}} -> ok 
+    after 2000 -> ?assert(failed_to_receive)
+  end,
+  ?assertMatch(ok, RetVal),
+  erlybullet:stop(World).
+  
+  

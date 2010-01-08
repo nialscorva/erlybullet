@@ -90,8 +90,13 @@ handle_call({create_entity,BoundPid,Options},_From,State) ->
   LocBin      = vector_to_binary(proplists:get_value(location,Options,{0.0,0.0,0.0})),
   VelocityBin = vector_to_binary(proplists:get_value(velocity,Options,{0.0,0.0,0.0})),
   cast_port(State#state.port,<<?EB_ADD_SHAPE:8,ShapeBin/binary,Id:64/native-integer,Mass/native-float,LocBin/binary,VelocityBin/binary>>),
-  ets:insert(State#state.id_table, {Id,BoundPid}),
-  {reply,{ok,Id},State#state{next_id=Id+1}}.
+  case proplists:get_value(id,Options,undefined) of
+    undefined -> ets:insert(State#state.id_table, {Id,BoundPid}), 
+                 UserId=Id;
+    UserId    -> ets:insert(State#state.id_table, {Id,{UserId,BoundPid}})
+  end,
+  {reply,{ok,UserId},State#state{next_id=Id+1}}.
+
 
 % --------------------------------------------------------------------
 %% @spec handle_cast(Msg::term(), State::state()) ->
@@ -115,9 +120,11 @@ handle_cast({step_simulation}, #state{port=Port}=State) ->
 %% @doc Handling all non call/cast messages
 %% @end
 % --------------------------------------------------------------------
-handle_info({erlybullet,Id,_}=Message,#state{id_table=Table}=State) ->
-  [{_Id,Pid}]=ets:lookup(Table,Id),
-  Pid ! Message,
+handle_info({erlybullet,Id,Rest}=Message,#state{id_table=Table}=State) ->
+  case ets:lookup(Table,Id) of
+    [{Id,{UserId,Pid}}] -> Pid ! {erlybullet,UserId,Rest}; 
+    [{Id,Pid}] -> Pid ! Message
+  end,
   {noreply,State};
 handle_info(Info, State) ->
   io:format("Received ~p~n",[Info]),
