@@ -5,6 +5,7 @@
 %% --------------------------------------------------------------------
 -module(erlybullet_tests).
 -include_lib("eunit/include/eunit.hrl").
+-compile(export_all).
 
 % External exports
 -export([]).
@@ -35,11 +36,11 @@ test_entity_create() ->
                                            [{shape,{sphere,50.0}},
                                             {location,{0.0,0.0,0.0}},
                                             {mass, 25.0},
-                                            {velocity,{1.0,0.0,1.0}}]),
+                                            {velocity,{100.0,0.0,100.0}}]),
   erlybullet:step_simulation(World),
   RetVal=receive
     {erlybullet,EntityId,{location,{_X,_Y,_Z}}} -> ok 
-    after 1000 -> ?assert(failed_to_receive)
+    after 2000 -> ?assert(failed_to_receive)
   end,
   ?assertMatch(ok, RetVal),
   erlybullet:stop(World).

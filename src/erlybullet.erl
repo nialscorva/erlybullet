@@ -15,7 +15,7 @@
 % gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {port,next_id=1}).
+-record(state, {port,next_id=1,id_table}).
 
 % --------------------------------------------------------------------
 %% @spec start_link() -> {ok, World::pid()}
@@ -66,7 +66,8 @@ init([]) ->
         E -> exit({stop, E})
   end,
   Port=open_port({spawn, "erlybullet_drv"}, [binary]),
-  {ok, #state{port=Port}}.
+  Table=ets:new(id_table,[set,private]),
+  {ok, #state{port=Port,id_table=Table}}.
 
 % --------------------------------------------------------------------
 %% @spec handle_call(Request::term(), From::pid(), State::state()) ->
@@ -82,13 +83,14 @@ init([]) ->
 % --------------------------------------------------------------------
 handle_call({stop}, _From, State) ->
   {stop,normal,ok,State};
-handle_call({create_entity,_BoundPid,Options},_From,State) ->
+handle_call({create_entity,BoundPid,Options},_From,State) ->
   ShapeBin    = shape_to_binary(proplists:get_value(shape,Options)),
   Id          = State#state.next_id, 
   Mass        = proplists:get_value(mass,Options,1.0),
   LocBin      = vector_to_binary(proplists:get_value(location,Options,{0.0,0.0,0.0})),
   VelocityBin = vector_to_binary(proplists:get_value(velocity,Options,{0.0,0.0,0.0})),
-  call_port(State#state.port,<<ShapeBin/binary,Id:64/native-integer,Mass/float,LocBin/binary,VelocityBin/binary>>),
+  cast_port(State#state.port,<<?EB_ADD_SHAPE:8,ShapeBin/binary,Id:64/native-integer,Mass/native-float,LocBin/binary,VelocityBin/binary>>),
+  ets:insert(State#state.id_table, {Id,BoundPid}),
   {reply,{ok,Id},State#state{next_id=Id+1}}.
 
 % --------------------------------------------------------------------
@@ -113,8 +115,13 @@ handle_cast({step_simulation}, #state{port=Port}=State) ->
 %% @doc Handling all non call/cast messages
 %% @end
 % --------------------------------------------------------------------
-handle_info(_Info, State) ->
-    {noreply, State}.
+handle_info({erlybullet,Id,_}=Message,#state{id_table=Table}=State) ->
+  [{_Id,Pid}]=ets:lookup(Table,Id),
+  Pid ! Message,
+  {noreply,State};
+handle_info(Info, State) ->
+  io:format("Received ~p~n",[Info]),
+  {noreply, State}.
 
 % --------------------------------------------------------------------
 %% @spec terminate/2(Reason::term(),State::state()) -> any()
@@ -122,8 +129,9 @@ handle_info(_Info, State) ->
 %% @doc Shutdown the server
 %% @end
 % --------------------------------------------------------------------
-terminate(_Reason, #state{port=Port}) ->
+terminate(_Reason, #state{port=Port,id_table=Table}) ->
   port_close(Port),
+  ets:delete(Table),
   ok.
 
 % --------------------------------------------------------------------
@@ -146,6 +154,6 @@ call_port(Port, Command) when is_port(Port) ->
 cast_port(Port, Command) when is_port(Port) ->
   port_command(Port,Command).
 
-shape_to_binary({sphere,Radius}) -> <<?EB_ADD_SPHERE,Radius/native-float>>.
+shape_to_binary({sphere,Radius}) -> <<?EB_SPHERE_SHAPE,Radius/native-float>>.
 
 vector_to_binary({X,Y,Z}) -> <<X/native-float,Y/native-float,Z/native-float>>.

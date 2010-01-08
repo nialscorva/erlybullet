@@ -6,9 +6,11 @@
 
 
 namespace erlybullet {
-class motion_state : btMotionState {
-  motion_state(const btTransform &initialpos) {
-      mPos1 = initialpos;
+class motion_state : public btMotionState {
+public:
+  motion_state(const btVector3 &initial_pos) :dirty(false) {
+  	mPos1.setIdentity();
+  	mPos1.setOrigin(initial_pos);
   }
 
   virtual ~motion_state() {
@@ -19,6 +21,8 @@ class motion_state : btMotionState {
   }
 
   virtual void setWorldTransform(const btTransform &worldTrans) {
+  	dirty=true;
+  	mPos1=worldTrans;
 //      if(NULL == mVisibleobj) return; // silently return before we set a node
 //      btQuaternion rot = worldTrans.getRotation();
 //      mVisibleobj->setOrientation(rot.w(), rot.x(), rot.y(), rot.z());
@@ -26,8 +30,13 @@ class motion_state : btMotionState {
 //      mVisibleobj->setPosition(pos.x(), pos.y(), pos.z());
   }
 
+  virtual void setClean() { dirty=false; }
+  virtual bool isDirty() { return dirty; }
+
 protected:
   btTransform mPos1;
+  bool dirty;
+  uint64_t id;
 };
 
 } // namespace erlybullet
