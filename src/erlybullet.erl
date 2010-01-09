@@ -10,7 +10,7 @@
 -include_lib("erlybullet/include/erlybulletcommands.hrl").
 
 % External exports
--export([start_link/0,stop/1,create_entity/3,step_simulation/1]).
+-export([start_link/0,stop/1,create_entity/3,step_simulation/1,destroy_entity/2]).
 
 % gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -50,6 +50,15 @@ create_entity(World,BoundPid,Options) when is_pid(World),is_pid(BoundPid),is_lis
   gen_server:call(World,{create_entity,BoundPid,Options}).
 
 % --------------------------------------------------------------------
+%% @spec remove_entity(World,EntityId) -> {ok, EntityId}
+%% @doc Creates a new entity in the world using Options.
+%% @end
+% --------------------------------------------------------------------
+destroy_entity(World,EntityId) when is_pid(World) ->
+  gen_server:call(World,{destroy_entity,EntityId}).
+
+
+% --------------------------------------------------------------------
 %% @spec init([]) ->
 %%          {ok, State}          |
 %%          {ok, State, Timeout} |
@@ -66,7 +75,7 @@ init([]) ->
         E -> exit({stop, E})
   end,
   Port=open_port({spawn, "erlybullet_drv"}, [binary]),
-  Table=ets:new(id_table,[set,private]),
+  Table=create_table(),
   {ok, #state{port=Port,id_table=Table}}.
 
 % --------------------------------------------------------------------
@@ -83,18 +92,19 @@ init([]) ->
 % --------------------------------------------------------------------
 handle_call({stop}, _From, State) ->
   {stop,normal,ok,State};
+handle_call({destroy_entity,UserId},_From,State) ->
+  {Id,UserId,_Pid}=find_by_user_id(State#state.id_table,UserId),
+  cast_port(State#state.port,<<?EB_REMOVE_ENTITY:8,Id:64/native-integer>>),
+  {reply,ok,State};
 handle_call({create_entity,BoundPid,Options},_From,State) ->
   ShapeBin    = shape_to_binary(proplists:get_value(shape,Options)),
   Id          = State#state.next_id, 
   Mass        = proplists:get_value(mass,Options,1.0),
   LocBin      = vector_to_binary(proplists:get_value(location,Options,{0.0,0.0,0.0})),
   VelocityBin = vector_to_binary(proplists:get_value(velocity,Options,{0.0,0.0,0.0})),
-  cast_port(State#state.port,<<?EB_ADD_SHAPE:8,ShapeBin/binary,Id:64/native-integer,Mass/native-float,LocBin/binary,VelocityBin/binary>>),
-  case proplists:get_value(id,Options,undefined) of
-    undefined -> ets:insert(State#state.id_table, {Id,BoundPid}), 
-                 UserId=Id;
-    UserId    -> ets:insert(State#state.id_table, {Id,{UserId,BoundPid}})
-  end,
+  UserId      = proplists:get_value(id,Options,{erlybullet,Id}),
+  insert_entity(State#state.id_table, {Id,UserId,BoundPid}),
+  cast_port(State#state.port,<<?EB_ADD_ENTITY:8,ShapeBin/binary,Id:64/native-integer,Mass/native-float,LocBin/binary,VelocityBin/binary>>),
   {reply,{ok,UserId},State#state{next_id=Id+1}}.
 
 
@@ -120,11 +130,10 @@ handle_cast({step_simulation}, #state{port=Port}=State) ->
 %% @doc Handling all non call/cast messages
 %% @end
 % --------------------------------------------------------------------
-handle_info({erlybullet,Id,Rest}=Message,#state{id_table=Table}=State) ->
-  case ets:lookup(Table,Id) of
-    [{Id,{UserId,Pid}}] -> Pid ! {erlybullet,UserId,Rest}; 
-    [{Id,Pid}] -> Pid ! Message
-  end,
+handle_info({erlybullet,Id,Rest},#state{id_table=Table}=State) ->
+  {Id,UserId,Pid}=find_by_id(Table,Id),
+  Pid ! {UserId,Rest},
+  io:format("Sent ~p~n",[{UserId,Rest}]),
   {noreply,State};
 handle_info(Info, State) ->
   io:format("Received ~p~n",[Info]),
@@ -138,7 +147,7 @@ handle_info(Info, State) ->
 % --------------------------------------------------------------------
 terminate(_Reason, #state{port=Port,id_table=Table}) ->
   port_close(Port),
-  ets:delete(Table),
+  free_table(Table),
   ok.
 
 % --------------------------------------------------------------------
@@ -164,3 +173,25 @@ cast_port(Port, Command) when is_port(Port) ->
 shape_to_binary({sphere,Radius}) -> <<?EB_SPHERE_SHAPE,Radius/native-float>>.
 
 vector_to_binary({X,Y,Z}) -> <<X/native-float,Y/native-float,Z/native-float>>.
+
+create_table() ->
+  IdTable=ets:new(entity_table,[set,private]),
+  UserIdTable=ets:new(id_table,[set,private]),
+  {IdTable,UserIdTable}.
+
+free_table({IdTable,UserIdTable}) ->
+  ets:delete(IdTable),
+  ets:delete(UserIdTable).
+
+
+insert_entity({IdTable,UserIdTable},{_,U,_}=Record) ->
+  ets:insert(IdTable, Record),
+  ets:insert(UserIdTable, {U,Record}).
+
+find_by_user_id({_,Table},UserId) ->
+  [{UserId,Rec}]=ets:lookup(Table,UserId),
+  Rec.
+
+find_by_id({Table,_},Id) ->
+  [Rec]=ets:lookup(Table,Id),
+  Rec.

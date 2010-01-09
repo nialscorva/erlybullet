@@ -122,7 +122,7 @@ void driver_data::step_simulation(unsigned char* buffer, int size)
 	}
 	last_run = now;
 }
-void driver_data::add_shape(unsigned char* buffer, int size)
+void driver_data::add_entity(unsigned char* buffer, int size)
 {
 	// <<ShapeBin/binary,Id:64/native-integer,Mass/float,LocBin/binary,VelocityBin/binary>>
 	btCollisionShape* shape=decode_shape(buffer,size);
@@ -157,6 +157,21 @@ void driver_data::add_shape(unsigned char* buffer, int size)
 	bodies.insert(std::make_pair(id,body));
 }
 
+void driver_data::remove_entity(unsigned char* buffer, int size)
+{
+	uint64_t id;
+	EXTRACT(buffer,size,id);
+
+	body_map_type::iterator it=bodies.find(id);
+	if(it != bodies.end())
+	{
+		world->removeRigidBody(it->second);
+		delete it->second->getCollisionShape();
+		delete it->second->getMotionState();
+		delete it->second;
+		bodies.erase(it);
+	}
+}
 
 void tick_callback(const btDynamicsWorld *world, btScalar timeStep)
 {

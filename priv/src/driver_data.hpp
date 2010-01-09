@@ -15,7 +15,8 @@ namespace erlybullet { class motion_state; }
 
 struct driver_data {
 public:
-	void add_shape(unsigned char* buffer, int size);
+	void add_entity(unsigned char* buffer, int size);
+	void remove_entity(unsigned char* buffer, int size);
 	void step_simulation(unsigned char* buffer, int size);
 
   driver_data(ErlDrvPort p);
