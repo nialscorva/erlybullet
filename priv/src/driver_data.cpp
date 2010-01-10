@@ -15,18 +15,21 @@
 
 namespace erlybullet {
 
+static void tick_callback(btDynamicsWorld *world, btScalar timeStep);
 
-void tick_callback(btDynamicsWorld *world, btScalar timeStep);
-
+// convenience for debugging
 std::ostream& operator<<(std::ostream& out, const btVector3& vec)
 {
 	return out << "(" << vec.x() << "," << vec.y() << "," << vec.z() << ")";
 }
 
+/// Does a memcpy of the variable out of the buffer, saving a lot of boilerplate code.
 #define EXTRACT(Buffer,Size,Var) assert(Size >= sizeof(Var)); memcpy(&Var,Buffer,sizeof(Var)); buffer += sizeof(Var); size += sizeof(Var)
 
-
-btCollisionShape* decode_shape(unsigned char* &buffer,int &size)
+//-------------------------------------------------------------------------------------------------
+/// Hides the big switch statement that would uglify the code below.  Simply switches on the shape type, extracts
+/// the shape parameters, and returns the collision shape.
+inline static btCollisionShape* decode_shape(unsigned char* &buffer,int &size)
 {
 	unsigned char shape;
 	EXTRACT(buffer,size,shape);
@@ -41,7 +44,9 @@ btCollisionShape* decode_shape(unsigned char* &buffer,int &size)
 	}
 }
 
-const btVector3 decode_vector(unsigned char* &buffer,int &size)
+//-------------------------------------------------------------------------------------------------
+/// Extracts a vector from the buffer.  This is done fairly frequently.
+inline static const btVector3 decode_vector(unsigned char* &buffer,int &size)
 {
 	double x,y,z;
 	EXTRACT(buffer,size,x);
@@ -51,6 +56,8 @@ const btVector3 decode_vector(unsigned char* &buffer,int &size)
 }
 
 
+//-------------------------------------------------------------------------------------------------
+/// Basic constructor.  Sets up the simulation and saves off the basic necessities.
 driver_data::driver_data(ErlDrvPort p) :
 	port(p),
 	broadphase(new btDbvtBroadphase),
@@ -63,7 +70,8 @@ driver_data::driver_data(ErlDrvPort p) :
 	world->setInternalTickCallback(tick_callback,this);
 }
 
-
+//-------------------------------------------------------------------------------------------------
+/// Cleanup
 driver_data::~driver_data()
 {
 	body_map_type::iterator it=bodies.begin();
@@ -83,7 +91,9 @@ driver_data::~driver_data()
 }
 
 
-// broken, saving reference to a temporary like a noob
+//-------------------------------------------------------------------------------------------------
+/// Turns a motion_state::vec into a 3-tuple.  This is safe because we know that the vec will live
+/// until after the driver_output() call finishes.
 template<class INSERT_ITERATOR>
 void write_vector(const motion_state::vec& v, INSERT_ITERATOR& t)
 {
@@ -93,7 +103,10 @@ void write_vector(const motion_state::vec& v, INSERT_ITERATOR& t)
 	*t = ERL_DRV_TUPLE; *t = 3;
 }
 
-
+//-------------------------------------------------------------------------------------------------
+/// Advances the simulation by the amount of time since it's last run.  The clock is maintained
+/// internally.  It may be worth refactoring to optionally pass in a timestep.
+/// TODO make world->stepSimulation() use the asynchronous threadpool
 void driver_data::step_simulation(unsigned char* buffer, int size)
 {
 	timeval start;
@@ -108,32 +121,32 @@ void driver_data::step_simulation(unsigned char* buffer, int size)
 
 	world->stepSimulation(elapsed,5);
 
+	// loop over the bodies in the simulation and send them all to the erlang side
 	body_map_type::iterator it=bodies.begin();
 	for(;it != bodies.end();++it)
 	{
 		motion_state* ms=dynamic_cast<motion_state*>(it->second->getMotionState());
 		if(ms->isDirty())
 		{
-
 			btTransform wt;
 			ms->getWorldTransform(wt);
 			motion_state::vec pos(wt.getOrigin());
+			motion_state::vec velocity(it->second->getLinearVelocity());
 
 			std::vector<ErlDrvTermData> terms;
 			std::back_insert_iterator<std::vector<ErlDrvTermData> > t = std::back_inserter(terms);
 
-			// term {erlybullet, EntityId, [{location,{x,y,z}},{velocity,{vx,vy,vz}}]}
-			*t=ERL_DRV_ATOM;  *t = driver_mk_atom("erlybullet");
-		  *t = ERL_DRV_UINT; *t = it->first;
+			// term {erlybullet, EntityId, [{location,{x,y,z}},{velocity,{vx,vy,vz}},{collisions,[...]}]}
+			*t = ERL_DRV_ATOM;  *t = driver_mk_atom("erlybullet");
+		  *t = ERL_DRV_UINT;  *t = it->first;
 			int list_elements=1;
 
-			*t = ERL_DRV_ATOM; *t = driver_mk_atom("location");
+			*t = ERL_DRV_ATOM;  *t = driver_mk_atom("location");
 			write_vector(pos,t);
 			*t = ERL_DRV_TUPLE; *t = 2;
 			list_elements++;
 
-			motion_state::vec velocity(it->second->getLinearVelocity());
-			*t = ERL_DRV_ATOM; *t = driver_mk_atom("velocity");
+			*t = ERL_DRV_ATOM;  *t = driver_mk_atom("velocity");
 			write_vector(velocity,t);
 			*t = ERL_DRV_TUPLE; *t = 2;
 			list_elements++;
@@ -143,6 +156,12 @@ void driver_data::step_simulation(unsigned char* buffer, int size)
 			int num_collisions=1;
 			*t = ERL_DRV_ATOM; *t = driver_mk_atom("collisions");
 			motion_state::collision_map::iterator collisionI=ms->begin_collision();
+
+			// the motion_state::vec class largely exists to support this loop.  If we used
+			// temporary doubles, they would go out of scope before the driver_output_term()
+			// call.  converting them to doubles first and storing them that way lets them
+			// live until the ms->reset() call, avoiding allocation or corruption.  It's
+			// vaguely clever, so I documented it.
 			for(;collisionI != ms->end_collision();++collisionI,++num_collisions)
 			{
 				*t = ERL_DRV_UINT; *t = collisionI->first;
@@ -154,9 +173,9 @@ void driver_data::step_simulation(unsigned char* buffer, int size)
 			*t = ERL_DRV_TUPLE; *t=2; // close the "collision" pair
 			++list_elements;
 
-			// close off the term
+			// close off the top level term
 			*t = ERL_DRV_NIL;
-			*t = ERL_DRV_LIST; *t = list_elements;
+			*t = ERL_DRV_LIST;  *t = list_elements;
 			*t = ERL_DRV_TUPLE; *t = 3;
 
 			driver_output_term(port,&terms[0],terms.size());
@@ -165,6 +184,10 @@ void driver_data::step_simulation(unsigned char* buffer, int size)
 	}
 	last_run = now;
 }
+
+//-------------------------------------------------------------------------------------------------
+/// Adds a rigid body to the simulation.  Currently only handles spheres, but easily extendable.
+/// The ID must be unique, in case of duplicate the old ones will be deleted without notification.
 void driver_data::add_entity(unsigned char* buffer, int size)
 {
 	// <<ShapeBin/binary,Id:64/native-integer,Mass/float,LocBin/binary,VelocityBin/binary>>
@@ -206,6 +229,9 @@ void driver_data::add_entity(unsigned char* buffer, int size)
 	bodies.insert(std::make_pair(id,body));
 }
 
+//-------------------------------------------------------------------------------------------------
+/// Removes an entity by it's ID.  There is no notification that the entity was removed from the
+/// calling process.
 void driver_data::remove_entity(unsigned char* buffer, int size)
 {
 	uint64_t id;
@@ -222,6 +248,12 @@ void driver_data::remove_entity(unsigned char* buffer, int size)
 	}
 }
 
+//-------------------------------------------------------------------------------------------------
+/// Callback function for the internal simulation tick.  Looks for collisions and saves them for
+/// later delivery.  Only the last collision is recorded.  So if A and B bounce off each other
+/// 5 times in one step, the last one is sent up to Erlang.
+/// MUST NOT interact with the Erlang port in any way, since the simulation
+/// step call is going to be made async at some point.
 void driver_data::tick(double timeStep)
 {
 	int numManifolds = world->getDispatcher()->getNumManifolds();
@@ -245,16 +277,15 @@ void driver_data::tick(double timeStep)
 				motion_state* msB=dynamic_cast<motion_state*>(obB->getMotionState());
 				msA->addCollision(msB->get_id(),ptA);
 				msB->addCollision(msA->get_id(),ptB);
-
-				std::cout << "Found collision at " << ptA << " and " << ptB << " at distance " << pt.getDistance()
-								  << " on " << msA->get_id() << " and " << msB->get_id() << std::endl;
 			}
 		}
 	}
 
 }
 
-void tick_callback(btDynamicsWorld *world, btScalar timeStep)
+//-------------------------------------------------------------------------------------------------
+/// Trampoline function for the tick callback.
+static void tick_callback(btDynamicsWorld *world, btScalar timeStep)
 {
   driver_data *w = static_cast<driver_data*>(world->getWorldUserInfo());
   w->tick(timeStep);

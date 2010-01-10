@@ -14,7 +14,8 @@ namespace erlybullet {
 
 class motion_state;
 
-
+/// The meat of the driver.  Documentation is in the .cpp file, since most is only relavent to the
+/// implementation of the function.
 struct driver_data {
 public:
 	void add_entity(unsigned char* buffer, int size);
@@ -34,7 +35,6 @@ private:
   body_map_type                        bodies;
   btDiscreteDynamicsWorld*             world;   // The world.
   uint64_t                             last_run;
-
 };
 
 } // namespace erlybullet
