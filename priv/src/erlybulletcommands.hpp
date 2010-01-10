@@ -1,4 +1,4 @@
-// comment
+// This file gets processed into the erlang .hrl to maintain consistency.
 
 #define EB_STEP_SIMULATION 1
 #define EB_ADD_ENTITY 2

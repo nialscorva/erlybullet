@@ -18,6 +18,7 @@ public:
 	void add_entity(unsigned char* buffer, int size);
 	void remove_entity(unsigned char* buffer, int size);
 	void step_simulation(unsigned char* buffer, int size);
+	void tick(double timestep);
 
   driver_data(ErlDrvPort p);
 	~driver_data();

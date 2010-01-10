@@ -102,9 +102,11 @@ handle_call({create_entity,BoundPid,Options},_From,State) ->
   Mass        = proplists:get_value(mass,Options,1.0),
   LocBin      = vector_to_binary(proplists:get_value(location,Options,{0.0,0.0,0.0})),
   VelocityBin = vector_to_binary(proplists:get_value(velocity,Options,{0.0,0.0,0.0})),
+  Restitution = proplists:get_value(restitution,Options,0.5),
   UserId      = proplists:get_value(id,Options,{erlybullet,Id}),
   insert_entity(State#state.id_table, {Id,UserId,BoundPid}),
-  cast_port(State#state.port,<<?EB_ADD_ENTITY:8,ShapeBin/binary,Id:64/native-integer,Mass/native-float,LocBin/binary,VelocityBin/binary>>),
+  cast_port(State#state.port,<<?EB_ADD_ENTITY:8,ShapeBin/binary,Id:64/native-integer,Mass/native-float,
+                               LocBin/binary,VelocityBin/binary,Restitution/native-float>>),
   {reply,{ok,UserId},State#state{next_id=Id+1}}.
 
 
@@ -132,12 +134,20 @@ handle_cast({step_simulation}, #state{port=Port}=State) ->
 % --------------------------------------------------------------------
 handle_info({erlybullet,Id,Rest},#state{id_table=Table}=State) ->
   {Id,UserId,Pid}=find_by_id(Table,Id),
-  Pid ! {UserId,Rest},
+  Params=lists:map(fun(A) -> translate(A,Table) end, Rest),
+  Pid ! {UserId,Params},
   io:format("Sent ~p~n",[{UserId,Rest}]),
   {noreply,State};
 handle_info(Info, State) ->
   io:format("Received ~p~n",[Info]),
   {noreply, State}.
+
+
+translate({collisions,Collisions},Table) ->
+  {collisions,lists:map(fun({Id,Where}) -> {Id, UserId, Pid} = find_by_id(Table,Id), {UserId, Pid, Where} end, Collisions)};
+translate(E, _Table) ->
+  E.
+
 
 % --------------------------------------------------------------------
 %% @spec terminate/2(Reason::term(),State::state()) -> any()
