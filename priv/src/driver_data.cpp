@@ -7,10 +7,14 @@
 #include <iostream>
 #include <btBulletDynamicsCommon.h>
 
-#include "erlybulletMotionState.hpp"
+#include "motion_state.hpp"
 #include "erlybulletcommands.hpp"
 
 #include "driver_data.hpp"
+
+
+namespace erlybullet {
+
 
 void tick_callback(btDynamicsWorld *world, btScalar timeStep);
 
@@ -81,7 +85,7 @@ driver_data::~driver_data()
 
 // broken, saving reference to a temporary like a noob
 template<class INSERT_ITERATOR>
-void write_vector(const erlybullet::motion_state::vec& v, INSERT_ITERATOR& t)
+void write_vector(const motion_state::vec& v, INSERT_ITERATOR& t)
 {
 	*t = ERL_DRV_FLOAT; *t = (ErlDrvTermData)&v.x;
 	*t = ERL_DRV_FLOAT; *t = (ErlDrvTermData)&v.y;
@@ -107,13 +111,13 @@ void driver_data::step_simulation(unsigned char* buffer, int size)
 	body_map_type::iterator it=bodies.begin();
 	for(;it != bodies.end();++it)
 	{
-		erlybullet::motion_state* ms=dynamic_cast<erlybullet::motion_state*>(it->second->getMotionState());
+		motion_state* ms=dynamic_cast<motion_state*>(it->second->getMotionState());
 		if(ms->isDirty())
 		{
 
 			btTransform wt;
 			ms->getWorldTransform(wt);
-			erlybullet::motion_state::vec pos(wt.getOrigin());
+			motion_state::vec pos(wt.getOrigin());
 
 			std::vector<ErlDrvTermData> terms;
 			std::back_insert_iterator<std::vector<ErlDrvTermData> > t = std::back_inserter(terms);
@@ -128,7 +132,7 @@ void driver_data::step_simulation(unsigned char* buffer, int size)
 			*t = ERL_DRV_TUPLE; *t = 2;
 			list_elements++;
 
-			erlybullet::motion_state::vec velocity(it->second->getLinearVelocity());
+			motion_state::vec velocity(it->second->getLinearVelocity());
 			*t = ERL_DRV_ATOM; *t = driver_mk_atom("velocity");
 			write_vector(velocity,t);
 			*t = ERL_DRV_TUPLE; *t = 2;
@@ -138,7 +142,7 @@ void driver_data::step_simulation(unsigned char* buffer, int size)
 			// {collision, [{id,{x,y,z}} ... ] }
 			int num_collisions=1;
 			*t = ERL_DRV_ATOM; *t = driver_mk_atom("collisions");
-			erlybullet::motion_state::collision_map::iterator collisionI=ms->begin_collision();
+			motion_state::collision_map::iterator collisionI=ms->begin_collision();
 			for(;collisionI != ms->end_collision();++collisionI,++num_collisions)
 			{
 				*t = ERL_DRV_UINT; *t = collisionI->first;
@@ -182,7 +186,7 @@ void driver_data::add_entity(unsigned char* buffer, int size)
 	btVector3 localInertia(0,0,0);
 	shape->calculateLocalInertia(mass,localInertia);
 
-	erlybullet::motion_state* ms = new erlybullet::motion_state(location,id);
+	motion_state* ms = new motion_state(location,id);
 	btRigidBody::btRigidBodyConstructionInfo rbInfo(mass,ms,shape,localInertia);
 	btRigidBody* body = new btRigidBody(rbInfo);
 	body->setLinearVelocity(velocity);
@@ -237,8 +241,8 @@ void driver_data::tick(double timeStep)
 				const btVector3& ptB = pt.getPositionWorldOnB();
 				const btVector3& normalOnB = pt.m_normalWorldOnB;
 
-				erlybullet::motion_state* msA=dynamic_cast<erlybullet::motion_state*>(obA->getMotionState());
-				erlybullet::motion_state* msB=dynamic_cast<erlybullet::motion_state*>(obB->getMotionState());
+				motion_state* msA=dynamic_cast<motion_state*>(obA->getMotionState());
+				motion_state* msB=dynamic_cast<motion_state*>(obB->getMotionState());
 				msA->addCollision(msB->get_id(),ptA);
 				msB->addCollision(msA->get_id(),ptB);
 
@@ -256,3 +260,4 @@ void tick_callback(btDynamicsWorld *world, btScalar timeStep)
   w->tick(timeStep);
 }
 
+} //namespace erlybullet

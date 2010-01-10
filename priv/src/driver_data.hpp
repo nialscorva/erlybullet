@@ -10,7 +10,9 @@ class btCollisionDispatcher;
 class btDiscreteDynamicsWorld;
 class btRigidBody;
 
-namespace erlybullet { class motion_state; }
+namespace erlybullet {
+
+class motion_state;
 
 
 struct driver_data {
@@ -34,4 +36,7 @@ private:
   uint64_t                             last_run;
 
 };
+
+} // namespace erlybullet
+
 #endif //DRIVER_DATA_HPP_INCLUDED__
