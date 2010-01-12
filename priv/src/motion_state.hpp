@@ -1,3 +1,5 @@
+// Copyright 2009 Jason Wagner
+// Released under the zlib license.  See LICENSE.txt
 #ifndef ERLYBULLETMOTIONSTATE_H_INCLUDED__
 #define ERLYBULLETMOTIONSTATE_H_INCLUDED__
 

@@ -1,3 +1,5 @@
+// Copyright 2009 Jason Wagner
+// Released under the zlib license.  See LICENSE.txt
 #include <erl_driver.h>
 #include <ei.h>
 #include <stdio.h>
@@ -76,6 +78,7 @@ static void outputv(ErlDrvData drv_data, ErlIOVec *ev)
 		case EB_STEP_SIMULATION:   data->step_simulation((unsigned char*)&(buffer->orig_bytes[1]),buffer->orig_size-1); break;
 		case EB_ADD_ENTITY:        data->add_entity(     (unsigned char*)&(buffer->orig_bytes[1]),buffer->orig_size-1); break;
 		case EB_REMOVE_ENTITY:     data->remove_entity(  (unsigned char*)&(buffer->orig_bytes[1]),buffer->orig_size-1); break;
+		case EB_APPLY_IMPULSE:     data->apply_impulse(  (unsigned char*)&(buffer->orig_bytes[1]),buffer->orig_size-1); break;
   }
 }
 

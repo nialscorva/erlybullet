@@ -1,3 +1,5 @@
+// Copyright 2009 Jason Wagner
+// Released under the zlib license.  See LICENSE.txt
 #ifndef DRIVER_DATA_HPP_INCLUDED__
 #define DRIVER_DATA_HPP_INCLUDED__
 #include <erl_driver.h>
@@ -21,6 +23,7 @@ public:
 	void add_entity(unsigned char* buffer, int size);
 	void remove_entity(unsigned char* buffer, int size);
 	void step_simulation(unsigned char* buffer, int size);
+	void apply_impulse(unsigned char* buffer, int size);
 	void tick(double timestep);
 
   driver_data(ErlDrvPort p);

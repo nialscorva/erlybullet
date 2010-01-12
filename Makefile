@@ -1,3 +1,6 @@
+# Copyright 2009 Jason Wagner
+# Released under the zlib license.  See LICENSE.txt
+
 appname = erlybullet
 
 # directories
@@ -27,7 +30,7 @@ products := ${beams} ${app_file} ${rel_file}
 ################################################################
 # Rules
 ################################################################
-.PHONY: all compile shell run
+.PHONY: all compile shell run doc
 all: compile
 
 compile: ${sources} include/erlybulletcommands.hrl 

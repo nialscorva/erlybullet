@@ -1,4 +1,5 @@
-
+# Copyright 2009 Jason Wagner
+# Released under the zlib license.  See LICENSE.txt
 
 src     := ./src
 sources := $(shell find ${src} -iname \*.cpp)

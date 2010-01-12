@@ -1,3 +1,5 @@
+// Copyright 2009 Jason Wagner
+// Released under the zlib license.  See LICENSE.txt
 #include <erl_driver.h>
 #include <ei.h>
 #include <stdio.h>
@@ -113,12 +115,16 @@ void driver_data::step_simulation(unsigned char* buffer, int size)
 	gettimeofday(&start,NULL);
 	uint64_t now=uint64_t(start.tv_sec)*uint64_t(1e6) + uint64_t(start.tv_usec);
 
-	float elapsed=float(now-last_run)/1000.0f;
+	double elapsed=double(now-last_run)/1000.0;
 
 	// if there is no last run data, step the simulation by 1/60th of a second to get things rolling
 	if(last_run==0)
 		elapsed = 1.0/30.0;
 
+	if(size > 0)
+	{
+		EXTRACT(buffer,size,elapsed);
+	}
 	world->stepSimulation(elapsed,5);
 
 	// loop over the bodies in the simulation and send them all to the erlang side
@@ -282,6 +288,21 @@ void driver_data::tick(double timeStep)
 	}
 
 }
+
+void driver_data::apply_impulse(unsigned char* buffer, int size)
+{
+	uint64_t id;
+	EXTRACT(buffer,size,id);
+	btVector3 impulse=decode_vector(buffer,size);
+	btRigidBody* rb=bodies[id];
+
+	if(rb)
+	{
+		rb->applyCentralImpulse(impulse);
+	}
+}
+
+
 
 //-------------------------------------------------------------------------------------------------
 /// Trampoline function for the tick callback.
