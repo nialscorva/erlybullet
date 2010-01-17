@@ -18,8 +18,8 @@ erl_boot :=
 erl_config := 
 erlc_flags := +debug_info
 #inputs 
-sources = $(shell find ${src} -iname \*.erl)
-test_src = $(shell find ${test} -iname \*_tests.erl)
+sources = $(wildcard ${src}/*.erl)
+test_src = $(wildcard ${test}/*_tests.erl)
 includes := -I ${includedir}
 
 #outputs
