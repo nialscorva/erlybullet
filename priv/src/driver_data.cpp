@@ -143,16 +143,16 @@ void driver_data::step_simulation(unsigned char* buffer, int size)
 			std::back_insert_iterator<std::vector<ErlDrvTermData> > t = std::back_inserter(terms);
 
 			// term {erlybullet, EntityId, [{location,{x,y,z}},{velocity,{vx,vy,vz}},{collisions,[...]}]}
-			*t = ERL_DRV_ATOM;  *t = driver_mk_atom("erlybullet");
+			*t = ERL_DRV_ATOM;  *t = driver_mk_atom((char*)"erlybullet");
 		  *t = ERL_DRV_UINT;  *t = it->first;
 			int list_elements=1;
 
-			*t = ERL_DRV_ATOM;  *t = driver_mk_atom("location");
+			*t = ERL_DRV_ATOM;  *t = driver_mk_atom((char*)"location");
 			write_vector(pos,t);
 			*t = ERL_DRV_TUPLE; *t = 2;
 			list_elements++;
 
-			*t = ERL_DRV_ATOM;  *t = driver_mk_atom("velocity");
+			*t = ERL_DRV_ATOM;  *t = driver_mk_atom((char*)"velocity");
 			write_vector(velocity,t);
 			*t = ERL_DRV_TUPLE; *t = 2;
 			list_elements++;
@@ -160,7 +160,7 @@ void driver_data::step_simulation(unsigned char* buffer, int size)
 
 			// {collision, [{id,{x,y,z}} ... ] }
 			int num_collisions=1;
-			*t = ERL_DRV_ATOM; *t = driver_mk_atom("collisions");
+			*t = ERL_DRV_ATOM; *t = driver_mk_atom((char*)"collisions");
 			motion_state::collision_map::iterator collisionI=ms->begin_collision();
 
 			// the motion_state::vec class largely exists to support this loop.  If we used

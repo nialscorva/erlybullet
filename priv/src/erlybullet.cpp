@@ -22,7 +22,7 @@ static ErlDrvEntry erlybullet_driver_entry = {
     NULL,                        /* output */
     NULL,                        /* ready_input */
     NULL,                        /* ready_output */
-    "erlybullet_drv",            /* the name of the driver */
+    (char*)"erlybullet_drv",            /* the name of the driver */
     NULL,                        /* finish */
     NULL,                        /* handle */
     NULL,                        /* control */
