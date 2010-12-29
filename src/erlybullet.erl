@@ -25,13 +25,13 @@
 
 %% @private @type id_tuple() = {Id::integer(), UserId::term(), Pid::pid()}.
 
-%% @type body_shape() = {sphere, Radius::float()}
+%% @type body_shape() = {sphere, Radius::float()}.
 
-%% @type client_message() = {UserId, [ client_params() ]}
+%% @type client_message() = {UserId, [ client_params() ]}.
 
 %% @type client_params() = {location, vector3()} 
 %%                       | {velocity, vector3()} 
-%%                       | {collision, [{With_Who_Id::term(), With_Who_Pid::pid(), Where::vector3()}]}
+%%                       | {collision, [{With_Who_Id::term(), With_Who_Pid::pid(), Where::vector3()}]}.
 
 % --------------------------------------------------------------------
 %% @spec start_link() -> {ok, World::pid()}
@@ -120,6 +120,7 @@ init([]) ->
   case erl_ddll:load_driver(code:lib_dir(erlybullet,priv), "erlybullet_drv") of
         ok -> ok;
         {error, already_loaded} -> ok;
+        {error, Any} -> exit({stop, Any, erl_ddll:format_error(Any)});
         E -> exit({stop, E})
   end,
   Port=open_port({spawn, "erlybullet_drv"}, [binary]),
@@ -263,7 +264,9 @@ cast_port(Port, Command) when is_port(Port) ->
 %% @doc Encodes a shape to binary.
 %% @end
 % --------------------------------------------------------------------
-shape_to_binary({sphere,Radius}) -> <<?EB_SPHERE_SHAPE,Radius/native-float>>.
+shape_to_binary({sphere,Radius}) -> <<?EB_SPHERE_SHAPE,Radius/native-float>>;
+
+shape_to_binary(Shape) -> throw({unknown_shape,Shape}).
 
 % --------------------------------------------------------------------
 %% @spec vector_to_binary(vector3()) -> binary()
