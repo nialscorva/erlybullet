@@ -7,4 +7,3 @@ doc/
 erl_crash.dump
 .cproject
 priv/erlybullet_drv.so
-include/erlybulletcommands.hrl
