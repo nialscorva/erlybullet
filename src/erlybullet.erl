@@ -193,7 +193,6 @@ handle_info({erlybullet,Id,Rest},#state{id_table=Table}=State) ->
   {Id,UserId,Pid}=find_by_id(Table,Id),
   Params=lists:map(fun(A) -> translate(A,Table) end, Rest),
   Pid ! {UserId,Params},
-  io:format("Sent ~p~n",[{UserId,Rest}]),
   {noreply,State};
 handle_info(Info, State) ->
   io:format("Received ~p~n",[Info]),
